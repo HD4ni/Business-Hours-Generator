@@ -2,13 +2,15 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>精緻版 IG Story 排班表 - 進階功能版</title>
+    <title>IG Story Schedule Generator</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&family=Playfair+Display:ital,wght@0,600;1,400&family=Poppins:wght@300;400&display=swap">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
             --sunday-red: #E57373;
             --saturday-blue: #81D4FA;
             --glass-bg: rgba(255, 255, 255, 0.7);
+            --purple-main: #9B59B6;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -19,75 +21,102 @@
             display: flex; flex-direction: column; align-items: center; padding: 20px; color: #eee;
         }
 
+        /* 上方控制台 */
         .admin-panel {
             background: #2d2d2d; padding: 20px; border-radius: 15px; margin-bottom: 25px;
             width: 450px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 13px;
         }
         .admin-panel div { display: flex; flex-direction: column; gap: 6px; }
         .full-width { grid-column: span 2; }
-        input[type="text"], textarea { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #3d3d3d; color: #fff; }
-        input[type="color"] { width: 100%; height: 38px; border: none; cursor: pointer; background: transparent; }
         
-        .batch-btn {
-            background: #666; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.3s;
-        }
-        .batch-btn.active-mode { background: #E57373; } /* 當處於可取消狀態時變色 */
+        .input-group { position: relative; width: 100%; height: 39px; }
+        #bgInput { padding: 10px 50px 10px 10px; border-radius: 6px; border: 1px solid #444; background: #3d3d3d; color: #fff; width: 100%; height: 100%; outline: none; }
+        #fileInput { display: none; }
+        .upload-trigger { position: absolute; right: 0; top: 0; bottom: 0; width: 46px; background: #555; color: white; border-radius: 0 6px 6px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; border: 1px solid #444; transition: 0.2s; }
 
+        input[type="color"] { width: 100%; height: 38px; border: none; cursor: pointer; background: transparent; }
+        .action-btn { background: var(--purple-main); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.3s; width: 100%; }
+        .batch-btn { background: #666; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.3s; }
+        .batch-btn.active-mode { background: #E57373; }
+
+        /* 預覽下方控制台 */
+        .footer-panel {
+            background: #2d2d2d; padding: 20px; border-radius: 15px; margin-top: 25px;
+            width: 450px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 13px;
+        }
+
+        /* 9:16 預覽區域 */
         #storyPreview {
             width: 450px; height: 800px; background-color: #333; background-size: cover; background-position: center;
             position: relative; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; border: 1px solid #444;
         }
-
-        .main-container { position: relative; z-index: 2; width: 85%; margin-top: 60px; display: flex; flex-direction: column; align-items: center; height: 100%; }
-        .month-num { font-family: 'Playfair Display', serif; font-size: 100px; line-height: 0.8; color: #333; }
-        .month-eng { font-family: 'Playfair Display', serif; font-style: italic; font-size: 28px; margin-bottom: 35px; color: #333; }
+        
+        .main-container { 
+            position: relative; z-index: 2; width: 85%; 
+            margin-top: 40px; 
+            display: flex; flex-direction: column; align-items: center; height: 100%; 
+            transition: color 0.3s;
+        }
+        
+        /* 標題區域修正：移除所有線條 */
+        .year-label { font-size: 14px; letter-spacing: 4px; color: inherit; margin-bottom: -5px; font-weight: 300; opacity: 0.8; }
+        .month-num { 
+            font-family: 'Playfair Display', serif; font-size: 110px; line-height: 0.8; 
+            color: inherit; margin-bottom: 5px; 
+            border: none !important; /* 強制移除邊框 */
+        }
+        .month-eng { 
+            font-family: 'Playfair Display', serif; font-style: italic; font-size: 32px; 
+            color: inherit; margin-bottom: 30px; 
+            border: none !important; /* 強制移除邊框 */
+            padding-top: 0; 
+        }
 
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; width: 100%; }
-        .weekday { text-align: center; font-size: 10px; font-weight: 600; color: #666; padding: 5px 0 12px; letter-spacing: 1px; cursor: pointer; border-radius: 4px; transition: 0.2s; }
-        .weekday:hover { background: rgba(255,255,255,0.3); color: #000; }
+        .weekday { text-align: center; font-size: 10px; font-weight: 600; color: #666; padding-bottom: 12px; letter-spacing: 1px; cursor: pointer; border-radius: 4px; }
 
         .day-cell {
             background: var(--glass-bg); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-            height: 72px; display: flex; flex-direction: column; align-items: center;
+            height: 80px; display: flex; flex-direction: column; align-items: center;
             padding-top: 5px; border-radius: 3px; cursor: pointer; border: 1px solid rgba(255,255,255,0.4);
         }
         .day-cell span { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 2px; }
-        .day-cell.inactive { visibility: hidden; }
-
-        .time-label { font-size: 10px; line-height: 1.2; width: 100%; text-align: center; font-weight: 500; }
+        .time-label { font-size: 10px; line-height: 1.1; width: 100%; text-align: center; font-weight: 500; }
         .closed-label { color: #D32F2F; font-weight: 700; font-size: 9px; margin-top: 3px; }
-
-        .footer-info { margin-top: 45px; text-align: center; font-size: 13px; line-height: 1.6; white-space: pre-wrap; width: 90%; padding: 12px; border-radius: 8px; color: #333; transition: 0.3s; }
+        
+        .footer-info { margin-top: 35px; text-align: center; font-size: 13px; line-height: 1.6; white-space: pre-wrap; width: 95%; padding: 12px; border-radius: 8px; color: #333; }
         .has-content { background: var(--glass-bg); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.4); }
 
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #fff; padding: 25px; border-radius: 15px; width: 360px; color: #333; }
-        .time-scroll-area { max-height: 300px; overflow-y: auto; margin: 10px 0; padding-right: 5px; }
-        .time-options-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-        .time-btn { padding: 8px 2px; border: 1px solid #ddd; background: #fff; cursor: pointer; border-radius: 4px; font-size: 10px; font-family: 'Montserrat'; }
-        .time-btn.active { background: #9B59B6; color: white; border-color: #9B59B6; }
-        .limit-hint { font-size: 11px; color: #888; margin-bottom: 10px; text-align: right; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 10000; }
+        .modal-content { background: #fff; padding: 30px; border-radius: 20px; width: 360px; color: #333; box-shadow: 0 15px 40px rgba(0,0,0,0.4); }
+        .time-scroll-area { max-height: 320px; overflow-y: auto; margin: 15px 0; padding: 5px; }
+        .time-options-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .time-btn { padding: 10px 2px; border: 1px solid #eee; background: #fff; cursor: pointer; border-radius: 8px; font-size: 11px; font-family: 'Montserrat'; transition: 0.2s; }
+        .time-btn.active { background: var(--purple-main); color: white; border-color: var(--purple-main); }
+        #saveBtn { width: 100%; padding: 15px; background: var(--purple-main); color: white; border: none; border-radius: 12px; margin-top: 15px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        
+        input[type="text"], textarea { 
+            padding: 10px; border-radius: 6px; border: 1px solid #444; background: #3d3d3d; color: #fff; width: 100%; outline: none;
+        }
     </style>
 </head>
 <body>
 
     <div class="admin-panel">
         <div class="full-width">
-            <label>1. 背景圖片網址：</label>
-            <input type="text" id="bgInput" placeholder="貼上網址後自動預覽">
+            <label>背景圖片 (網址或點擊📁上傳)：</label>
+            <div class="input-group">
+                <input type="text" id="bgInput" placeholder="https://..."><label for="fileInput" class="upload-trigger">📁</label><input type="file" id="fileInput" accept="image/*">
+            </div>
         </div>
-        <div><label>2. 標題顏色：</label><input type="color" id="titleColor" value="#333333"></div>
-        <div><label>3. 營業時段顏色：</label><input type="color" id="timeColor" value="#9B59B6"></div>
-        <div class="full-width"><label>4. 下方說明文字：</label><textarea id="descInput" rows="2"></textarea></div>
-        <div><label>5. 說明文字顏色：</label><input type="color" id="descColor" value="#333333"></div>
-        <div>
-            <label>6. 快速工具：</label>
-            <button id="toggleClosedBtn" class="batch-btn" onclick="toggleClosedAll()">一鍵公休 / 取消</button>
-        </div>
+        <div><label>標題與年份顏色：</label><input type="color" id="titleColor" value="#333333"></div>
+        <div><label>營業時段顏色：</label><input type="color" id="timeColor" value="#9B59B6"></div>
+        <div class="full-width"><label>快速工具：</label><button id="toggleClosedBtn" class="batch-btn" onclick="toggleClosedAll()">填滿 / 取消公休</button></div>
     </div>
 
     <div id="storyPreview">
-        <div class="main-container">
+        <div class="main-container" id="titleContainer">
+            <p class="year-label">2026</p>
             <h1 class="month-num" id="uiMonth">04</h1>
             <p class="month-eng" id="uiMonthEng">April</p>
             <div class="calendar-grid">
@@ -104,143 +133,158 @@
         </div>
     </div>
 
+    <div class="footer-panel">
+        <div class="full-width">
+            <label>下方說明文字：</label>
+            <textarea id="descInput" rows="2" placeholder="在此輸入補充說明..."></textarea>
+        </div>
+        <div class="full-width">
+            <label>說明文字顏色：</label>
+            <input type="color" id="descColor" value="#333333">
+        </div>
+        <div class="full-width">
+            <button class="action-btn" onclick="downloadStory()">下載成圖片</button>
+        </div>
+    </div>
+
     <div class="modal" id="setupModal">
         <div class="modal-content">
             <h3 id="modalDateDisplay">設定日期</h3>
-            <p id="modalBatchHint" style="font-size: 11px; color: #9B59B6; margin-bottom: 5px; display: none;">※ 批次設定模式</p>
-            <p class="limit-hint">最多選取 4 個時段</p>
-            <label style="display:block; margin: 10px 0;"><input type="checkbox" id="checkClosed"> 今日公休</label>
-            <div class="time-scroll-area">
-                <div id="timeOptionsGrid" class="time-options-grid"></div>
-            </div>
-            <button id="saveBtn" style="width:100%; padding:12px; background:#9B59B6; color:white; border:none; border-radius:8px; margin-top:10px; cursor:pointer; font-weight: 600;">儲存設定</button>
+            <label style="display:block; margin: 15px 0; font-weight: 600; cursor: pointer;">
+                <input type="checkbox" id="isClosedCheck" style="transform: scale(1.2); margin-right: 8px;"> 今日公休
+            </label>
+            <div class="time-scroll-area"><div id="timeOptionsGrid" class="time-options-grid"></div></div>
+            <button id="saveBtn">儲存設定</button>
         </div>
     </div>
 
 <script>
+    // JS 部分維持與前版一致
     const scheduleData = {};
-    let activeKey = null;
-    let isBatchMode = false;
-    let isClosedFillActive = false; // 追蹤一鍵公休狀態
+    let activeKey = null, isBatchMode = false, isClosedFillActive = false;
+    const YEAR = 2026, MONTH = 3; 
 
-    const YEAR = 2026;
-    const MONTH = 3; 
-
-    document.getElementById('bgInput').addEventListener('input', (e) => document.getElementById('storyPreview').style.backgroundImage = `url('${e.target.value}')`);
-    document.getElementById('titleColor').addEventListener('input', (e) => {
-        document.getElementById('uiMonth').style.color = e.target.value;
-        document.getElementById('uiMonthEng').style.color = e.target.value;
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => document.getElementById('storyPreview').style.backgroundImage = `url('${ev.target.result}')`;
+        reader.readAsDataURL(file);
     });
-    document.getElementById('descColor').addEventListener('input', (e) => document.getElementById('uiDesc').style.color = e.target.value);
+    document.getElementById('bgInput').addEventListener('input', (e) => {
+        if(e.target.value.trim()) document.getElementById('storyPreview').style.backgroundImage = `url('${e.target.value.trim()}')`;
+    });
+
+    document.getElementById('titleColor').addEventListener('input', e => {
+        document.getElementById('titleContainer').style.color = e.target.value;
+    });
+    document.getElementById('descColor').addEventListener('input', e => document.getElementById('uiDesc').style.color = e.target.value);
     document.getElementById('timeColor').addEventListener('input', () => render());
-    document.getElementById('descInput').addEventListener('input', (e) => {
-        const uiDesc = document.getElementById('uiDesc');
-        uiDesc.innerText = e.target.value;
-        e.target.value.trim().length > 0 ? uiDesc.classList.add('has-content') : uiDesc.classList.remove('has-content');
+    document.getElementById('descInput').addEventListener('input', e => {
+        const ui = document.getElementById('uiDesc');
+        ui.innerText = e.target.value;
+        e.target.value.trim() ? ui.classList.add('has-content') : ui.classList.remove('has-content');
     });
 
-    // 初始化時間按鈕 (新增 :30)
     const timeGrid = document.getElementById('timeOptionsGrid');
     for(let h=8; h<=22; h++){
-        [":00", ":30"].forEach(min => {
+        [":00", ":30"].forEach(m => {
             let b = document.createElement('button');
-            b.className = 'time-btn';
-            b.innerText = `${h.toString().padStart(2, '0')}${min}`;
+            b.className = 'time-btn'; b.innerText = `${h.toString().padStart(2,'0')}${m}`;
             b.onclick = () => {
-                if (!b.classList.contains('active') && document.querySelectorAll('.time-btn.active').length >= 4) {
-                    alert("不可以超過 4 個時間段喔！"); return;
-                }
+                const activeCount = document.querySelectorAll('.time-btn.active').length;
+                if (!b.classList.contains('active') && activeCount >= 4) return alert("上限 4 個時段喔！");
                 b.classList.toggle('active');
             };
             timeGrid.appendChild(b);
         });
     }
 
-    document.getElementById('checkClosed').addEventListener('change', (e) => {
-        if(e.target.checked) document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
-    });
-
-    function openBatchModal(dayIndex, dayName) {
-        isBatchMode = true; activeKey = `BATCH-${dayIndex}`;
-        document.getElementById('modalDateDisplay').innerText = `批次設定：所有 ${dayName}`;
-        document.getElementById('modalBatchHint').style.display = 'block';
-        document.getElementById('checkClosed').checked = false;
-        document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('setupModal').style.display = 'flex';
-    }
-
-    function openSingleModal(day, key) {
-        isBatchMode = false; activeKey = key;
-        document.getElementById('modalDateDisplay').innerText = `設定 ${day} 日`;
-        document.getElementById('modalBatchHint').style.display = 'none';
-        const c = scheduleData[key] || {closed: false, times: []};
-        document.getElementById('checkClosed').checked = c.closed;
-        document.querySelectorAll('.time-btn').forEach(btn => btn.classList.toggle('active', c.times.includes(btn.innerText)));
-        document.getElementById('setupModal').style.display = 'flex';
-    }
-
     document.getElementById('saveBtn').onclick = () => {
-        const closed = document.getElementById('checkClosed').checked;
+        const closed = document.getElementById('isClosedCheck').checked;
         const times = Array.from(document.querySelectorAll('.time-btn.active')).map(b => b.innerText);
-        const config = { closed, times: closed ? [] : times };
+        const config = (closed || times.length > 0) ? { closed, times: closed ? [] : times } : null;
 
         if (isBatchMode) {
-            const dayIndex = parseInt(activeKey.split('-')[1]);
-            const firstDay = new Date(YEAR, MONTH, 1).getDay();
+            const idx = parseInt(activeKey.split('-')[1]);
+            const first = new Date(YEAR, MONTH, 1).getDay();
             const total = new Date(YEAR, MONTH + 1, 0).getDate();
             for(let d=1; d<=total; d++) {
-                if ((firstDay + d - 1) % 7 === dayIndex) scheduleData[`${YEAR}-${MONTH}-${d}`] = JSON.parse(JSON.stringify(config));
+                if((first+d-1)%7 === idx) {
+                    const key = `${YEAR}-${MONTH}-${d}`;
+                    if (config) scheduleData[key] = JSON.parse(JSON.stringify(config));
+                    else delete scheduleData[key];
+                }
             }
         } else {
-            scheduleData[activeKey] = config;
+            if (config) scheduleData[activeKey] = config;
+            else delete scheduleData[activeKey];
         }
         document.getElementById('setupModal').style.display = 'none';
         render();
     };
 
-    // 一鍵公休切換功能
+    function openBatchModal(idx, name) {
+        isBatchMode = true; activeKey = `BATCH-${idx}`;
+        document.getElementById('modalDateDisplay').innerText = `批次：所有 ${name}`;
+        document.getElementById('isClosedCheck').checked = false;
+        document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('setupModal').style.display = 'flex';
+    }
+
+    function openSingleModal(d, key) {
+        isBatchMode = false; activeKey = key;
+        document.getElementById('modalDateDisplay').innerText = `設定 ${d} 日`;
+        const c = scheduleData[key] || {closed: false, times: []};
+        document.getElementById('isClosedCheck').checked = c.closed;
+        document.querySelectorAll('.time-btn').forEach(b => b.classList.toggle('active', c.times.includes(b.innerText)));
+        document.getElementById('setupModal').style.display = 'flex';
+    }
+
     function toggleClosedAll() {
         const total = new Date(YEAR, MONTH + 1, 0).getDate();
-        const btn = document.getElementById('toggleClosedBtn');
-
         if (!isClosedFillActive) {
-            // 模式：填滿公休
             for(let d=1; d<=total; d++) {
                 const key = `${YEAR}-${MONTH}-${d}`;
-                if (!scheduleData[key]) scheduleData[key] = { closed: true, times: [] };
+                if (!scheduleData[key] || (!scheduleData[key].closed && scheduleData[key].times.length === 0)) {
+                    scheduleData[key] = { closed: true, times: [] };
+                }
             }
-            isClosedFillActive = true;
-            btn.classList.add('active-mode');
+            isClosedFillActive = true; document.getElementById('toggleClosedBtn').classList.add('active-mode');
         } else {
-            // 模式：取消所有公休
             for(let d=1; d<=total; d++) {
                 const key = `${YEAR}-${MONTH}-${d}`;
                 if (scheduleData[key] && scheduleData[key].closed) delete scheduleData[key];
             }
-            isClosedFillActive = false;
-            btn.classList.remove('active-mode');
+            isClosedFillActive = false; document.getElementById('toggleClosedBtn').classList.remove('active-mode');
         }
         render();
     }
 
+    function downloadStory() {
+        html2canvas(document.getElementById('storyPreview'), { useCORS: true, scale: 3 }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'IG_Story_Calendar.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+    }
+
     function render() {
         const first = new Date(YEAR, MONTH, 1).getDay();
-        const days = new Date(YEAR, MONTH + 1, 0).getDate();
-        const body = document.getElementById('calendarBody');
-        const userTimeColor = document.getElementById('timeColor').value;
+        const total = new Date(YEAR, MONTH + 1, 0).getDate();
+        const body = document.getElementById('calendarBody'), tColor = document.getElementById('timeColor').value;
         body.innerHTML = '';
-        for(let i=0; i<first; i++) body.innerHTML += `<div class="day-cell inactive"></div>`;
-        for(let d=1; d<=days; d++){
-            const key = `${YEAR}-${MONTH}-${d}`;
-            const config = scheduleData[key];
+        for(let i=0; i<first; i++) body.innerHTML += `<div class="day-cell" style="visibility:hidden"></div>`;
+        for(let d=1; d<=total; d++){
+            const key = `${YEAR}-${MONTH}-${d}`, config = scheduleData[key];
             let html = `<span>${d}</span>`;
-            if(config){
+            if(config) {
                 if(config.closed) html += `<div class="closed-label">CLOSE</div>`;
-                else config.times.forEach(t => html += `<div class="time-label" style="color:${userTimeColor}">${t}</div>`);
+                else config.times.forEach(t => html += `<div class="time-label" style="color:${tColor}">${t}</div>`);
             }
             const cell = document.createElement('div');
-            cell.className = 'day-cell';
-            cell.innerHTML = html;
+            cell.className = 'day-cell'; cell.innerHTML = html;
             cell.onclick = () => openSingleModal(d, key);
             body.appendChild(cell);
         }
