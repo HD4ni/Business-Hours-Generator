@@ -122,6 +122,7 @@
 
         input[type="color"] { width: 100%; height: 35px; border: none; cursor: pointer; background: transparent; }
         input[type="range"] { accent-color: var(--purple-main); cursor: pointer; }
+        #colorPlanBlock .control-row { margin-bottom: 8px; }
 
         /* 效果選擇按鈕 */
         .effect-buttons { display: flex; gap: 10px; margin-top: 10px; }
@@ -230,15 +231,19 @@
             <div class="control-row"><div class="label-group"><label>縮放</label><span id="scaleVal">1.0</span></div><input type="range" id="bgScale" min="0.1" max="4" step="0.01" value="1"></div>
             <div class="control-row"><div class="label-group"><label>水平位移</label><span id="xVal">0</span></div><input type="range" id="bgX" min="-1000" max="1000" step="1" value="0"></div>
             <div class="control-row"><div class="label-group"><label>垂直位移</label><span id="yVal">0</span></div><input type="range" id="bgY" min="-1000" max="1000" step="1" value="0"></div>
+            <div class="control-row"><div class="label-group"><label>背景透明度</label><span id="bgOpacityVal">1.00</span></div><input type="range" id="bgOpacity" min="0" max="1" step="0.01" value="1"></div>
+            <div class="control-row"><div class="label-group"><label>背景霧化</label><span id="bgBlurVal">0</span></div><input type="range" id="bgBlur" min="0" max="25" step="0.5" value="0"></div>
         </div>
 
-        <div class="settings-block">
+        <div class="settings-block" id="colorPlanBlock">
             <h4>🎨 色彩計畫</h4>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <div class="control-row"><label>標題顏色</label><input type="color" id="titleColor" value="#333333" class="btn-anim"></div>
-                <div class="control-row"><label>時段文字</label><input type="color" id="timeColor" value="#9B59B6" class="btn-anim"></div>
-                <div class="control-row"><label>格底色</label><input type="color" id="cellBgColor" value="#ffffff" class="btn-anim"></div>
-                <div class="control-row"><label>說明顏色</label><input type="color" id="descColor" value="#333333" class="btn-anim"></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div class="control-row"><label>月份文字顏色</label><input type="color" id="titleColor" value="#333333" class="btn-anim"></div>
+                <div class="control-row"><label>時段文字顏色</label><input type="color" id="timeColor" value="#9B59B6" class="btn-anim"></div>
+                <div class="control-row"><label>日期文字顏色</label><input type="color" id="dateNumColor" value="#333333" class="btn-anim"></div>
+                <div class="control-row"><label>說明文字顏色</label><input type="color" id="descColor" value="#333333" class="btn-anim"></div>
+                <div class="control-row"><label>日期格底色</label><input type="color" id="cellBgColor" value="#ffffff" class="btn-anim"></div>
+                <div class="control-row"><label>說明格底色</label><input type="color" id="descBgColor" value="#ffffff" class="btn-anim"></div>
             </div>
             <div class="control-row"><div class="label-group"><label>格透明度</label><span id="opVal">0.7</span></div><input type="range" id="cellOpacity" min="0" max="1" step="0.05" value="0.7"></div>
             <div class="control-row"><label style="margin-bottom: 8px;">日期格效果：</label><div class="effect-buttons"><button class="effect-btn active" id="effectTransparent" onclick="changeEffect('transparent')">半透明</button><button class="effect-btn" id="effectFrosted" onclick="changeEffect('frosted')">毛玻璃 (請手動截圖)</button></div></div>
@@ -318,12 +323,18 @@
         const s = document.getElementById('bgScale').value;
         const x = document.getElementById('bgX').value;
         const y = document.getElementById('bgY').value;
+        const opacity = document.getElementById('bgOpacity').value;
+        const blur = document.getElementById('bgBlur').value;
         document.getElementById('scaleVal').innerText = s;
         document.getElementById('xVal').innerText = x;
         document.getElementById('yVal').innerText = y;
+        document.getElementById('bgOpacityVal').innerText = parseFloat(opacity).toFixed(2);
+        document.getElementById('bgBlurVal').innerText = blur;
         bgLayer.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${s})`;
+        bgLayer.style.opacity = opacity;
+        bgLayer.style.filter = `blur(${blur}px)`;
     };
-    ['bgScale', 'bgX', 'bgY'].forEach(id => document.getElementById(id).oninput = updateBgTransform);
+    ['bgScale', 'bgX', 'bgY', 'bgOpacity', 'bgBlur'].forEach(id => document.getElementById(id).oninput = updateBgTransform);
 
     document.getElementById('fileInput').onchange = e => {
         const file = e.target.files[0];
@@ -432,10 +443,12 @@
     }
 
     document.getElementById('titleColor').oninput = e => document.getElementById('titleContainer').style.color = e.target.value;
-    document.getElementById('cellBgColor').oninput = render;
-    document.getElementById('cellOpacity').oninput = e => { document.getElementById('opVal').innerText = e.target.value; render(); };
     document.getElementById('timeColor').oninput = render;
+    document.getElementById('dateNumColor').oninput = render;
     document.getElementById('descColor').oninput = e => document.getElementById('uiDesc').style.color = e.target.value;
+    document.getElementById('cellBgColor').oninput = render;
+    document.getElementById('descBgColor').oninput = render;
+    document.getElementById('cellOpacity').oninput = e => { document.getElementById('opVal').innerText = e.target.value; render(); };
     document.getElementById('descInput').oninput = e => {
         const ui = document.getElementById('uiDesc');
         ui.innerText = e.target.value;
@@ -510,12 +523,14 @@
 
         const first = new Date(YEAR, MONTH, 1).getDay(), total = new Date(YEAR, MONTH + 1, 0).getDate();
         const body = document.getElementById('calendarBody'), tColor = document.getElementById('timeColor').value;
+        const dateColor = document.getElementById('dateNumColor').value;
+        const descBgColor = document.getElementById('descBgColor').value;
         const fDay = document.getElementById('fontDay').value;
         body.innerHTML = '';
         for(let i=0; i<first; i++) body.innerHTML += `<div class="day-cell" style="visibility:hidden"></div>`;
         for(let d=1; d<=total; d++){
             const key = `${YEAR}-${MONTH}-${d}`, config = scheduleData[key];
-            let html = `<div class="day-num-tag">${d}</div>`;
+            let html = `<div class="day-num-tag" style="color:${dateColor}">${d}</div>`;
             if(config) {
                 if(config.closed) html += `<div class="closed-label">CLOSE</div>`;
                 else config.times.forEach(t => html += `<div class="time-label" style="color:${tColor}">${t}</div>`);
@@ -543,6 +558,8 @@
                 cell.style.background = rgba;
             }
         }
+        const uiDesc = document.getElementById('uiDesc');
+        uiDesc.style.background = descBgColor;
         document.querySelectorAll('.weekday').forEach(el => el.style.fontFamily = fDay);
     }
 
@@ -579,6 +596,7 @@
         });
     }
 
+    updateBgTransform();
     render(); updateFonts();
 </script>
 </body>
