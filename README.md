@@ -1,4 +1,4 @@
-# 📅 精緻版 IG Story 排班表生成器
+# 📅 IG Story 排班表生成器
 
 ## ⚡ [點擊這裡進入生成器](https://hd4ni.github.io/IG-Story-Schedule-Generator/)
 
