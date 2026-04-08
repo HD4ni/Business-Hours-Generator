@@ -71,10 +71,24 @@
 
         /* 日期格懸浮動畫 */
         .day-cell {
+            position: relative;
+            overflow: hidden;
             height: 80px; display: flex; flex-direction: column; align-items: flex-start; padding: 5px; 
             border-radius: 3px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background-clip: padding-box;
         }
+        .day-cell .glass-overlay {
+            position: absolute;
+            inset: 0;
+            background-repeat: no-repeat;
+            filter: blur(10px);
+            transform: scale(1.05);
+            opacity: 1;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .day-cell .cell-content { position: relative; z-index: 1; }
         .day-cell:hover { transform: translateY(-3px) scale(1.02); background: rgba(255,255,255,0.9) !important; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
         .day-cell.active-focus { border: 2.5px solid var(--purple-main); background: #fff !important; transform: scale(1.06); z-index: 10; box-shadow: 0 0 25px rgba(155, 89, 182, 0.5); }
         
@@ -118,24 +132,81 @@
 
         /* 毛玻璃效果模式 */
         .day-cell.frosted-glass {
-            background: rgba(255, 255, 255, 0.1) !important;
+            background: rgba(255, 255, 255, 0.22) !important;
             backdrop-filter: blur(10px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
         }
 
         .day-cell.transparent-mode {
             backdrop-filter: none !important;
         }
+
+        /* 美化檔案選擇按鈕 */
+        .file-input-wrapper {
+            position: relative;
+            display: block;
+            width: 100%;
+        }
+        .file-input-label {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 16px;
+            background: var(--card-bg);
+            border: 2px dashed #555;
+            border-radius: 8px;
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .file-input-label:hover {
+            border-color: var(--purple-main);
+            background: rgba(155, 89, 182, 0.1);
+            color: var(--purple-main);
+        }
+        .file-input-label:active {
+            transform: scale(0.98);
+        }
+        .file-input-wrapper:hover .file-input-label {
+            transform: translateY(-2px);
+            filter: brightness(1.2);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .file-input-wrapper:active .file-input-label {
+            transform: translateY(0) scale(0.96);
+        }
+        .file-input-label i {
+            margin-right: 8px;
+            font-size: 16px;
+        }
+        #fileInput {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
     </style>
 </head>
-<body>
 
+<body>
     <div class="panel">
         <div class="settings-block">
             <h4>🖼️ 影像無損校準</h4>
             <div class="control-row">
-                <input type="text" id="bgInput" placeholder="輸入圖片連結...">
-                <input type="file" id="fileInput" accept="image/*" class="btn-anim">
+                <div class="file-input-wrapper">
+                    <label for="fileInput" class="file-input-label btn-anim">
+                        <i>📁</i> 選擇背景圖片
+                    </label>
+                    <input type="file" id="fileInput" accept="image/*">
+                </div>
             </div>
             <div class="control-row"><div class="label-group"><label>縮放</label><span id="scaleVal">1.0</span></div><input type="range" id="bgScale" min="0.1" max="4" step="0.01" value="1"></div>
             <div class="control-row"><div class="label-group"><label>水平位移</label><span id="xVal">0</span></div><input type="range" id="bgX" min="-1000" max="1000" step="1" value="0"></div>
@@ -151,7 +222,7 @@
                 <div class="control-row"><label>說明顏色</label><input type="color" id="descColor" value="#333333" class="btn-anim"></div>
             </div>
             <div class="control-row"><div class="label-group"><label>格透明度</label><span id="opVal">0.7</span></div><input type="range" id="cellOpacity" min="0" max="1" step="0.05" value="0.7"></div>
-            <div class="control-row"><label style="margin-bottom: 8px;">日期格效果：</label><div class="effect-buttons"><button class="effect-btn active" id="effectTransparent" onclick="changeEffect('transparent')">半透明</button><button class="effect-btn" id="effectFrosted" onclick="changeEffect('frosted')">毛玻璃</button></div></div>
+            <div class="control-row"><label style="margin-bottom: 8px;">日期格效果：</label><div class="effect-buttons"><button class="effect-btn active" id="effectTransparent" onclick="changeEffect('transparent')">半透明</button><button class="effect-btn" id="effectFrosted" onclick="changeEffect('frosted')">毛玻璃 (請手動截圖)</button></div></div>
         </div>
 
         <div class="settings-block">
@@ -202,14 +273,19 @@
 
 <script>
     // 自動校準台灣時間
-    const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
-    let YEAR = now.getFullYear();
-    let MONTH = now.getMonth();
+    let YEAR, MONTH;
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    document.getElementById('uiYear').innerText = YEAR;
-    document.getElementById('uiMonth').innerText = (MONTH + 1).toString().padStart(2, '0');
-    document.getElementById('uiMonthEng').innerText = monthNames[MONTH];
+    function initCurrentDate() {
+        const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
+        YEAR = now.getFullYear();
+        MONTH = now.getMonth();
+        document.getElementById('uiYear').innerText = YEAR;
+        document.getElementById('uiMonth').innerText = (MONTH + 1).toString().padStart(2, '0');
+        document.getElementById('uiMonthEng').innerText = monthNames[MONTH];
+    }
+
+    initCurrentDate();
 
     const scheduleData = {};
     const weekdayColors = { 0: "#E57373", 1: "#aaaaaa", 2: "#aaaaaa", 3: "#aaaaaa", 4: "#aaaaaa", 5: "#aaaaaa", 6: "#81D4FA" };
@@ -334,14 +410,27 @@
                 else config.times.forEach(t => html += `<div class="time-label" style="color:${tColor}">${t}</div>`);
             }
             const cell = document.createElement('div');
-            cell.className = `day-cell ${activeKey === key ? 'active-focus' : ''}`; 
-            if(currentEffect === 'frosted') cell.classList.add('frosted-glass');
-            else cell.classList.add('transparent-mode');
-            cell.innerHTML = html; 
-            if(currentEffect === 'transparent') cell.style.background = rgba;
+            cell.className = `day-cell ${activeKey === key ? 'active-focus' : ''}`;
+            cell.innerHTML = `<div class="glass-overlay"></div><div class="cell-content">${html}</div>`;
             cell.style.fontFamily = fDay;
             cell.onclick = () => selectDay(d, key, cell);
             body.appendChild(cell);
+
+            const overlay = cell.querySelector('.glass-overlay');
+            if (currentEffect === 'frosted' && bgLayer.src) {
+                const bgRect = bgLayer.getBoundingClientRect();
+                const cellRect = cell.getBoundingClientRect();
+                const offsetX = cellRect.left - bgRect.left;
+                const offsetY = cellRect.top - bgRect.top;
+                overlay.style.display = 'block';
+                overlay.style.backgroundImage = `url('${bgLayer.src}')`;
+                overlay.style.backgroundSize = `${bgRect.width}px ${bgRect.height}px`;
+                overlay.style.backgroundPosition = `${-offsetX}px ${-offsetY}px`;
+                cell.style.background = 'rgba(255,255,255,0.22)';
+            } else {
+                overlay.style.display = 'none';
+                cell.style.background = rgba;
+            }
         }
         document.querySelectorAll('.weekday').forEach(el => el.style.fontFamily = fDay);
     }
@@ -359,9 +448,23 @@
     }
 
     function downloadStory() {
-        html2canvas(document.getElementById('storyPreview'), { useCORS: true, scale: 2, backgroundColor: null }).then(canvas => {
+        const scale = Math.max(3, Math.round(window.devicePixelRatio * 2));
+        html2canvas(document.getElementById('storyPreview'), {
+            useCORS: true,
+            scale,
+            backgroundColor: '#222',
+            imageTimeout: 20000,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: document.documentElement.scrollWidth,
+            windowHeight: document.documentElement.scrollHeight,
+            onclone: (clonedDoc) => {
+                const clonedPreview = clonedDoc.getElementById('storyPreview');
+                if (clonedPreview) clonedPreview.style.backgroundColor = '#222';
+            },
+        }).then(canvas => {
             const link = document.createElement('a'); link.download = `Schedule_${YEAR}_${MONTH+1}.png`;
-            link.href = canvas.toDataURL(); link.click();
+            link.href = canvas.toDataURL('image/png', 1.0); link.click();
         });
     }
 
